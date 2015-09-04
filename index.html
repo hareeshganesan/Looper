@@ -1,0 +1,283 @@
+<head>
+<title>REcorder</title>
+</head>
+
+<link href="main.css" media="all" rel="stylesheet" type="text/css">
+<script src="recorder.js"></script>
+
+<audio id="music" preload="true" loop="true">
+  <source id="mp3source" src="http://www.alexkatz.me/codepen/music/interlude.mp3">
+</audio>
+<div id="audioplayer">
+  <button id="pButton" class="play" onclick="play()"></button>
+  <div id="timeline">
+    <div id="playhead"></div>
+  </div>
+  <div id="loop"></div>
+</div>
+<button id="clearLoop" onclick="clearLoop()">Clear Loop</button>
+
+<button id="startLoop" onclick="startLoop()">Start Loop</button>
+<p id="loopstart"></p>
+<button id="endLoop" onclick="endLoop()">End Loop</button>
+<p id="loopend"></p>
+
+<button id="advance" onclick="advanceLoop()">Advance Loop</button>
+
+<button id="advance" onclick="playBack(0.5)">0.5x</button>
+<button id="advance" onclick="playBack(1)">1x</button>
+<button id="advance" onclick="playBack(2)">2x</button>
+
+<button onclick="startRecording(this);">record</button>
+<button onclick="stopRecording(this);" disabled>stop</button>
+
+<h2>Recordings</h2>
+<ul id="recordingslist"></ul>
+
+<h2>Log</h2>
+<pre id="log"></pre>
+
+
+
+<script type="text/javascript">
+var music = document.getElementById('music'); // id for audio element
+var duration; // Duration of audio clip
+var pButton = document.getElementById('pButton'); // play button
+var loopBar = document.getElementById('loop'); // loop bar
+var playhead = document.getElementById('playhead'); // playhead
+
+var timeline = document.getElementById('timeline'); // timeline
+// timeline width adjusted for playhead
+var timelineWidth = timeline.offsetWidth - playhead.offsetWidth;
+var start = 0;
+var end = -1;
+// timeupdate event listener
+music.addEventListener("timeupdate", timeUpdate, false);
+music.addEventListener("playing", replay, false);
+
+//Makes timeline clickable
+timeline.addEventListener("click", function (event) {
+	moveplayhead(event);
+	music.currentTime = duration * clickPercent(event);
+}, false);
+
+// returns click as decimal (.77) of the total timelineWidth
+function clickPercent(e) {
+	return (e.pageX - timeline.offsetLeft) / timelineWidth;
+}
+
+// Makes playhead draggable 
+playhead.addEventListener('mousedown', mouseDown, false);
+window.addEventListener('mouseup', mouseUp, false);
+
+// Boolean value so that mouse is moved on mouseUp only when the playhead is released 
+var onplayhead = false;
+// mouseDown EventListener
+function mouseDown() {
+	onplayhead = true;
+	window.addEventListener('mousemove', moveplayhead, true);
+	music.removeEventListener('timeupdate', timeUpdate, false);
+}
+// mouseUp EventListener
+// getting input from all mouse clicks
+function mouseUp(e) {
+	if (onplayhead == true) {
+		moveplayhead(e);
+		window.removeEventListener('mousemove', moveplayhead, true);
+		// change current time
+		music.currentTime = duration * clickPercent(e);
+		music.addEventListener('timeupdate', timeUpdate, false);
+	}
+	onplayhead = false;
+}
+// mousemove EventListener
+// Moves playhead as user drags
+function moveplayhead(e) {
+	var newMargLeft = e.pageX - timeline.offsetLeft;
+	if (newMargLeft >= 0 && newMargLeft <= timelineWidth) {
+		playhead.style.marginLeft = newMargLeft + "px";
+	}
+	if (newMargLeft < 0) {
+		playhead.style.marginLeft = "0px";
+	}
+	if (newMargLeft > timelineWidth) {
+		playhead.style.marginLeft = timelineWidth + "px";
+	}
+}
+
+// timeUpdate 
+// Synchronizes playhead position with current point in audio 
+function timeUpdate() {
+	var playPercent = timelineWidth * (music.currentTime / duration);
+	playhead.style.marginLeft = playPercent + "px";
+	if (music.currentTime == duration) {
+		pButton.className = "";
+		pButton.className = "play";
+	}
+
+	if(end !== -1 && !music.paused && music.currentTime >= end){
+		music.currentTime = start;
+	}
+}
+
+//Play and Pause
+function play() {
+	// start music
+	if (music.paused) {
+		if(start !== 0)
+			music.currentTime = start;
+		music.play();
+		// remove play, add pause
+		pButton.className = "";
+		pButton.className = "pause";
+	} else { // pause music
+		music.pause();
+		// remove pause, add play
+		pButton.className = "";
+		pButton.className = "play";
+	}
+}
+
+function startLoop() {
+	start = music.currentTime;
+	loopIndicator = document.getElementById('loopstart');
+	loopIndicator.innerText = start;
+	if(end > 0){
+		loopBar.style.marginLeft = (start/music.duration * timeline.offsetWidth) + "px";
+		loopBar.style.width = (((end - start)/music.duration)*timeline.offsetWidth) + "px";
+	}
+	else{
+		loopBar.style.marginLeft = (start/music.duration * timeline.offsetWidth) + "px";
+		loopBar.style.width = ((1- start/music.duration)*timeline.offsetWidth) + "px";
+	}
+}
+
+function endLoop() {
+	end = music.currentTime;
+	loopIndicator = document.getElementById('loopend');
+	loopIndicator.innerText = end;
+	if(end > 0){
+		loopBar.style.marginLeft = (start/music.duration * timeline.offsetWidth) + "px";
+		loopBar.style.width = (((end - start)/music.duration)*timeline.offsetWidth) + "px";
+	}
+}
+
+function clearLoop() {
+	start = 0;
+	end = -1;
+	loopIndicator = document.getElementById('loopstart');
+	loopIndicator.innerText = start;
+	loopIndicator = document.getElementById('loopend');
+	loopIndicator.innerText = end;
+	loopBar.style.marginLeft = "0";
+	loopBar.style.width = timeline.offsetWidth+"px";
+}
+
+function advanceLoop() {
+	music.pause();
+	var diff = end - start;
+	start = start + diff > music.duration ? music.duration : start + diff;
+	end = end+diff > music.duration ? music.duration : end + diff;
+	if(end > 0){
+		loopBar.style.marginLeft = (start/music.duration * timeline.offsetWidth) + "px";
+		loopBar.style.width = (((end - start)/music.duration)*timeline.offsetWidth) + "px";
+	}
+	music.play();
+}
+
+function replay(){
+	music.currentTime = start;
+}
+// Gets audio file duration
+music.addEventListener("canplaythrough", function () {
+	duration = music.duration;  
+}, false);
+
+function playBack(rate){
+	music.playbackRate = rate;
+}
+</script>
+
+
+<script>
+  function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+  }
+
+  var audio_context;
+  var recorder;
+
+  function startUserMedia(stream) {
+    var input = audio_context.createMediaStreamSource(stream);
+    __log('Media stream created.');
+
+    // Uncomment if you want the audio to feedback directly
+    //input.connect(audio_context.destination);
+    //__log('Input connected to audio context destination.');
+    
+    recorder = new Recorder(input, {
+    	sampleRate: 192000,
+    });
+    __log('Recorder initialised.');
+  }
+
+  function startRecording(button) {
+    recorder && recorder.record();
+    button.disabled = true;
+    button.nextElementSibling.disabled = false;
+    __log('Recording...');
+  }
+
+  function stopRecording(button) {
+    recorder && recorder.stop();
+    button.disabled = true;
+    button.previousElementSibling.disabled = false;
+    __log('Stopped recording.');
+    
+    // create WAV download link using audio data blob
+    loopFile();
+    
+    recorder.clear();
+  }
+
+  function loopFile() {
+    recorder && recorder.exportWAV(function(blob) {
+      var url = URL.createObjectURL(blob);
+      mp3source.src = url;
+      music.load();
+
+
+      var li = document.createElement('li');
+      var au = document.createElement('audio');
+      var hf = document.createElement('a');
+      
+      au.controls = true;
+      au.src = url;
+      hf.href = url;
+      hf.download = new Date().toISOString() + '.wav';
+      hf.innerHTML = hf.download;
+      li.appendChild(au);
+      li.appendChild(hf);
+      recordingslist.appendChild(li);
+    });
+  }
+
+  window.onload = function init() {
+    try {
+      // webkit shim
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
+      window.URL = window.URL || window.webkitURL;
+      
+      audio_context = new AudioContext;
+      __log('Audio context set up.');
+      __log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+    } catch (e) {
+      alert('No web audio support in this browser!');
+    }
+    
+    navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
+      __log('No live audio input: ' + e);
+    });
+  };
+  </script>
